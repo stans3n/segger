@@ -1,0 +1,98 @@
+src/segger/metrics/segment.py:61:def read_parquet_region(
+src/segger/metrics/segment.py:83:    region = dask_cudf.read_parquet(
+src/segger/metrics/segment.py:253:    transcripts = read_parquet_region(
+src/segger/metrics/segment.py:264:    boundaries = read_parquet_region(
+src/segger/metrics/segment.py:340:    transcripts = read_parquet_region(
+src/segger/metrics/segment.py:373:    boundaries = dask_cudf.read_parquet(
+src/segger/io/preprocessor.py:150:            bd_nuc = gpd.read_parquet(self.bd_out_nuc)
+src/segger/io/preprocessor.py:162:            bd_cell = gpd.read_parquet(self.bd_out_cell)
+src/segger/io/preprocessor.py:452:        bd = pl.read_parquet(filepath, parallel='row_groups')
+src/segger/io/preprocessor.py:142:        self.bd_out_cell = out_dir / 'cell_boundaries_geo.parquet'
+src/segger/io/preprocessor.py:177:        lbl = "cell_boundaries_id"
+src/segger/io/fields.py:28:    cell_filename: str = 'cell_boundaries.parquet'
+src/segger/io/fields.py:46:    cell_filename: str = 'cell_boundaries.parquet'
+src/segger/io/preprocessor.py:112:            Column in `transcripts` to group by (e.g. 'nucleus_boundaries_id').
+src/segger/io/preprocessor.py:141:        self.ad_out = out_dir / 'nucleus_boundaries.h5ad'
+src/segger/io/preprocessor.py:143:        self.bd_out_nuc = out_dir / 'nucleus_boundaries_geo.parquet'
+src/segger/io/preprocessor.py:173:        lbl = "nucleus_boundaries_id"
+src/segger/io/preprocessor.py:185:        ad = self._get_anndata(tx, label="nucleus_boundaries_id")
+src/segger/io/fields.py:29:    nucleus_filename: str = 'nucleus_boundaries.parquet'
+src/segger/io/fields.py:47:    nucleus_filename: str = 'nucleus_boundaries.parquet'
+src/segger/metrics/segment.py:163:    polygons_gp = polygons.to_geopandas()
+src/segger/geometry/quadtree.py:3:import geopandas as gpd
+src/segger/geometry/quadtree.py:198:    backend: Literal['cuspatial', 'geopandas'],
+src/segger/geometry/quadtree.py:230:    else: # geopandas
+src/segger/geometry/query.py:2:import geopandas as gpd
+src/segger/geometry/query.py:145:    ply_ixn = polygons_to_geoseries(polygons, backend='geopandas')
+src/segger/geometry/query.py:159:    pts_ixn = points_to_geoseries(pts_ixn, backend='geopandas')
+src/segger/geometry/query.py:268:    query_polygons = polygons_to_geoseries(query_polygons, backend='geopandas')
+src/segger/geometry/query.py:269:    index_polygons = polygons_to_geoseries(index_polygons, backend='geopandas')
+src/segger/geometry/conversion.py:3:import geopandas as gpd
+src/segger/geometry/conversion.py:75:            f"Input must be a non-empty geopandas.GeoSeries of points."
+src/segger/geometry/conversion.py:95:    backend: Literal['geopandas', 'cuspatial']
+src/segger/geometry/conversion.py:110:    backend : Literal['geopandas', 'cuspatial']
+src/segger/geometry/conversion.py:127:    if backend not in ['geopandas', 'cuspatial']:
+src/segger/geometry/conversion.py:130:            f"'geopandas' and 'cuspatial'."
+src/segger/geometry/conversion.py:133:    if (backend == 'geopandas' and isinstance(data, gpd.GeoSeries)) or \
+src/segger/geometry/conversion.py:140:    if backend == 'geopandas':
+src/segger/geometry/conversion.py:214:            f"Input must be a non-empty geopandas.GeoSeries of polygons."
+src/segger/geometry/conversion.py:235:    backend: Literal['geopandas', 'cuspatial']
+src/segger/geometry/conversion.py:251:    backend : Literal['geopandas', 'cuspatial']
+src/segger/geometry/conversion.py:268:    if backend not in ['geopandas', 'cuspatial']:
+src/segger/geometry/conversion.py:271:            f"'geopandas' and 'cuspatial'."
+src/segger/geometry/conversion.py:274:    if (backend == 'geopandas' and isinstance(data, gpd.GeoSeries)) or \
+src/segger/geometry/conversion.py:281:    if backend == 'geopandas':
+src/segger/geometry/conversion.py:331:    backend = 'cuspatial' if device == 'cuda' else 'geopandas'
+src/segger/geometry/morphology.py:1:import geopandas as gpd
+src/segger/io/preprocessor.py:7:import geopandas as gpd
+src/segger/io/cosmx.py:4:import geopandas as gpd
+src/segger/io/utils.py:2:import geopandas as gpd
+src/segger/data/tiling.py:5:import geopandas as gpd
+src/segger/data/tiling.py:18:    geopandas GeoSeries. This property should be computed once and cached.
+src/segger/data/tiling.py:207:        self._tiles = quadtree_to_geoseries(quadtree, backend='geopandas')
+src/segger/data/utils/anndata.py:3:import geopandas as gpd
+src/segger/data/utils/heterodata.py:3:import geopandas as gpd
+src/segger/data/utils/neighbors.py:4:import geopandas as gpd
+src/segger/geometry/query.py:161:        gpd.GeoDataFrame(geometry=pts_ixn),
+src/segger/geometry/query.py:162:        gpd.GeoDataFrame(geometry=ply_ixn),
+src/segger/geometry/query.py:263:    gpd.GeoDataFrame
+src/segger/geometry/query.py:271:        gpd.GeoDataFrame(geometry=index_polygons),
+src/segger/geometry/query.py:272:        gpd.GeoDataFrame(geometry=query_polygons),
+src/segger/io/preprocessor.py:60:    transcript and boundary GeoDataFrames for the given platform.
+src/segger/io/preprocessor.py:92:    def boundaries(self) -> gpd.GeoDataFrame:
+src/segger/io/preprocessor.py:100:        transcripts: gpd.GeoDataFrame,
+src/segger/io/preprocessor.py:109:        transcripts : gpd.GeoDataFrame
+src/segger/io/preprocessor.py:192:        transcripts: gpd.GeoDataFrame,
+src/segger/io/preprocessor.py:193:        boundaries: gpd.GeoDataFrame,
+src/segger/io/preprocessor.py:195:    ) -> gpd.GeoDataFrame:
+src/segger/io/preprocessor.py:201:        transcripts : gpd.GeoDataFrame
+src/segger/io/preprocessor.py:203:        boundaries : gpd.GeoDataFrame
+src/segger/io/preprocessor.py:210:        gpd.GeoDataFrame
+src/segger/io/preprocessor.py:326:    def boundaries(self) -> gpd.GeoDataFrame:
+src/segger/io/preprocessor.py:444:    ) -> gpd.GeoDataFrame:
+src/segger/io/preprocessor.py:464:    def boundaries(self) -> gpd.GeoDataFrame:
+src/segger/io/cosmx.py:24:) -> gpd.GeoDataFrame:
+src/segger/io/cosmx.py:37:    polygons : gpd.GeoDataFrame
+src/segger/io/cosmx.py:38:        GeoDataFrame of polygons indexed by unique cell IDs, with FOV info.
+src/segger/io/utils.py:48:) -> gpd.GeoDataFrame:
+src/segger/io/utils.py:63:    gpd.GeoDataFrame
+src/segger/io/utils.py:64:        GeoDataFrame containing Shapely polygons, indexed by unique cell ID.
+src/segger/io/utils.py:80:    return gpd.GeoDataFrame(geometry=polygons, index=ids[indices])
+src/segger/io/utils.py:105:def fix_invalid_geometry(gdf: gpd.GeoDataFrame):
+src/segger/data/utils/anndata.py:132:    boundaries: gpd.GeoDataFrame,
+src/segger/data/utils/heterodata.py:19:    boundaries: gpd.GeoDataFrame,
+src/segger/data/utils/neighbors.py:183:    bd: gpd.GeoDataFrame,
+src/segger/metrics/segment.py:229:    # Get ordered cell IDs from Xenium
+src/segger/io/preprocessor.py:24:    XeniumTranscriptFields, 
+src/segger/io/preprocessor.py:25:    XeniumBoundaryFields,
+src/segger/io/preprocessor.py:371:class XeniumPreprocessor(ISTPreprocessor):
+src/segger/io/preprocessor.py:373:    Preprocessor for 10x Genomics Xenium datasets.
+src/segger/io/preprocessor.py:379:        bd_fields = XeniumBoundaryFields()
+src/segger/io/preprocessor.py:380:        tx_fields = XeniumTranscriptFields()
+src/segger/io/preprocessor.py:389:                    f"Xenium sample directory must contain exactly 1 file or "
+src/segger/io/preprocessor.py:397:        raw = XeniumTranscriptFields()
+src/segger/io/preprocessor.py:448:        raw = XeniumBoundaryFields()
+src/segger/io/preprocessor.py:466:        raw = XeniumBoundaryFields()
+src/segger/io/preprocessor.py:479:        # 10X Xenium nucleus segmentation is intersection of geometries
+src/segger/io/fields.py:7:class XeniumTranscriptFields:
+src/segger/io/fields.py:27:class XeniumBoundaryFields:
