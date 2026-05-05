@@ -1,0 +1,164 @@
+===== src/segger/data/utils/anndata.py:160-230 =====
+        .join(
+            (
+                boundaries
+                .reset_index(names=bd_fields.index)
+                .set_index(bd_fields.id, verify_integrity=True)
+                .get(bd_fields.index)
+            ),
+            how="left",
+            validate="1:1",
+        )
+        .reset_index(names=bd_fields.id)
+        .set_index(bd_fields.index, verify_integrity=True)
+    )
+    assert ~ad.obs.index.isna().any()
+
+    # Remove genes with fewer than min counts permanently
+    ad.var['n_counts'] = ad.X.sum(0).A.flatten()
+    ad = ad[:,  ad.var['n_counts'].ge(genes_min_counts)]
+
+    # Explicitly sort indices for reproducibility
+    ad = ad[ad.obs.index.sort_values(), ad.var.index.sort_values()]
+    
+    # Add raw counts
+    ad.raw = ad.copy()
+    ad.layers['counts'] = ad.raw.X.copy()
+
+    # Keep track of filtered cells
+    ad.obs['n_counts'] = ad.raw.X.sum(1).A.flatten()
+    ad.obs['filtered'] = ad.obs['n_counts'].ge(cells_min_counts)
+
+    # Normalize to filtered dataset counts
+    ad.layers['norm'] = ad.layers['counts'].copy()
+    target_sum = ad.obs.loc[ad.obs['filtered'], 'n_counts'].median()
+    sc.pp.normalize_total(ad, target_sum=target_sum, layer='norm')
+
+    # Build gene embedding on filtered dataset
+    C = np.corrcoef(ad[ad.obs['filtered']].layers['norm'].todense().T)
+    C = np.nan_to_num(C, 0, posinf=True, neginf=True)
+    model = sklearn.decomposition.PCA(n_components=cells_embedding_size)
+    ad.varm['X_corr'] = model.fit_transform(C)
+
+    # Build PCs on filtered cells and project all cells
+    counts_sparse_gpu = cupyx.scipy.sparse.csr_matrix(ad.layers['norm'])
+    model = cuml.PCA(n_components=cells_embedding_size)
+    model.fit(counts_sparse_gpu[ad.obs['filtered'].values])
+    ad.obsm['X_pca'] = model.transform(counts_sparse_gpu).get()
+
+    # Compute clusters on filtered cells
+    cell_clusters = phenograph_rapids(
+        ad[ad.obs['filtered']].obsm['X_pca'],
+        n_neighbors=cells_clusters_n_neighbors, 
+        resolution=cells_clusters_resolution,
+        min_size=100,
+    )
+    ad.obs['phenograph_cluster'] = -1  # removed cells have no cluster
+    ad.obs.loc[ad.obs['filtered'], 'phenograph_cluster'] = cell_clusters
+    ad.obs['phenograph_cluster'] = pd.Categorical(ad.obs['phenograph_cluster'])
+
+    # Compute pairwise cosine similarities among cell clusters
+    ad.uns['cell_cluster_similarities'] = get_cluster_cosine_similarity(
+        embedding=torch.tensor(ad.obsm['X_pca']),
+        clusters=torch.tensor(ad.obs['phenograph_cluster'].values),
+    ).numpy()
+
+    # Compute clusters on genes from embedding
+    ad.var['phenograph_cluster'] = phenograph_rapids(
+        ad.varm['X_corr'],
+        n_neighbors=genes_clusters_n_neighbors,
+        resolution=genes_clusters_resolution,
+        min_size=-1,
+    )
+
+===== src/segger/data/utils/neighbors.py:1-90 =====
+from numpy.typing import ArrayLike
+from scipy.spatial import KDTree
+from typing import Any, Literal
+import geopandas as gpd
+import polars as pl
+import numpy as np
+import cupy as cp
+import cugraph
+import torch
+import cuml
+import cudf
+import gc
+
+from ...io import TrainingTranscriptFields, TrainingBoundaryFields
+from ...geometry import points_in_polygons
+
+
+def phenograph_rapids(
+    X: ArrayLike,
+    n_neighbors: int,
+    min_size: int = -1,
+    **kwargs,
+) -> np.ndarray:
+    """TODO: Add description.
+    """
+    X = cp.array(X)
+    model = cuml.neighbors.NearestNeighbors(n_neighbors=n_neighbors)
+    model.fit(X)
+    _, indices = model.kneighbors(X)
+
+    n, k = indices.shape
+    edges = cudf.concat([
+        cudf.Series(np.repeat(np.arange(n), k), name='source', dtype="int32"),
+        cudf.Series(indices.flatten(), name='destination', dtype="int32"),
+    ], axis=1)
+    G = cugraph.from_cudf_edgelist(edges)
+    
+    # Build jaccard-weighted graph in GPU
+    jaccard_edges = cugraph.jaccard(G, edges[['source', 'destination']])
+    G = cugraph.from_cudf_edgelist(jaccard_edges, *jaccard_edges.columns)
+    
+    # Cluster jaccard-weighted graph
+    result, _ = cugraph.louvain(G, **kwargs)
+    
+    # Sort clusters by size
+    sizes = result['partition'].value_counts()
+    sizes.loc[:] = cp.where(sizes > min_size, cp.arange(len(sizes)), -1)
+    result['partition'] = result['partition'].map(sizes)
+    
+    # Sort by vertex (e.g. cell)
+    return result.sort_values('vertex')['partition'].values.get()
+
+
+def knn_to_edge_index(
+    neighbor_table: torch.Tensor,
+    padding_value = None,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """
+    Convert a dense neighbor table (with padding) into COO edge index.
+
+    Parameters
+    ----------
+    neighbor_table : (N, K) long tensor
+        Sampled neighbor table with N used as padding value.
+
+    Returns
+    -------
+    edge index : (2, E) long tensor
+    index pointer  : (N+1,) long tensor
+    """
+    with torch.no_grad():
+        N, K   = neighbor_table.shape
+        if padding_value is None:
+            padding_value = N
+        device = neighbor_table.device
+
+        valid  = neighbor_table != padding_value
+        flat   = valid.view(-1).nonzero(as_tuple=False).squeeze(1)
+        col    = neighbor_table.view(-1)[flat]
+        row    = flat // K
+
+        edge_index = torch.stack([row, col])
+
+        deg = valid.sum(dim=1)
+        index_ptr = torch.cat(
+            (torch.zeros(1, dtype=torch.long, device=device), deg.cumsum(0))
+        )
+        del valid, flat, col, row, deg
+        torch.cuda.empty_cache()
+        gc.collect()

@@ -1,0 +1,195 @@
+===== local caller: src/segger/data/utils/anndata.py lines 160-215 =====
+   160	        .join(
+   161	            (
+   162	                boundaries
+   163	                .reset_index(names=bd_fields.index)
+   164	                .set_index(bd_fields.id, verify_integrity=True)
+   165	                .get(bd_fields.index)
+   166	            ),
+   167	            how="left",
+   168	            validate="1:1",
+   169	        )
+   170	        .reset_index(names=bd_fields.id)
+   171	        .set_index(bd_fields.index, verify_integrity=True)
+   172	    )
+   173	    assert ~ad.obs.index.isna().any()
+   174	
+   175	    # Remove genes with fewer than min counts permanently
+   176	    ad.var['n_counts'] = ad.X.sum(0).A.flatten()
+   177	    ad = ad[:,  ad.var['n_counts'].ge(genes_min_counts)]
+   178	
+   179	    # Explicitly sort indices for reproducibility
+   180	    ad = ad[ad.obs.index.sort_values(), ad.var.index.sort_values()]
+   181	    
+   182	    # Add raw counts
+   183	    ad.raw = ad.copy()
+   184	    ad.layers['counts'] = ad.raw.X.copy()
+   185	
+   186	    # Keep track of filtered cells
+   187	    ad.obs['n_counts'] = ad.raw.X.sum(1).A.flatten()
+   188	    ad.obs['filtered'] = ad.obs['n_counts'].ge(cells_min_counts)
+   189	
+   190	    # Normalize to filtered dataset counts
+   191	    ad.layers['norm'] = ad.layers['counts'].copy()
+   192	    target_sum = ad.obs.loc[ad.obs['filtered'], 'n_counts'].median()
+   193	    sc.pp.normalize_total(ad, target_sum=target_sum, layer='norm')
+   194	
+   195	    # Build gene embedding on filtered dataset
+   196	    C = np.corrcoef(ad[ad.obs['filtered']].layers['norm'].todense().T)
+   197	    C = np.nan_to_num(C, 0, posinf=True, neginf=True)
+   198	    model = sklearn.decomposition.PCA(n_components=cells_embedding_size)
+   199	    ad.varm['X_corr'] = model.fit_transform(C)
+   200	
+   201	    # Build PCs on filtered cells and project all cells
+   202	    counts_sparse_gpu = cupyx.scipy.sparse.csr_matrix(ad.layers['norm'])
+   203	    model = cuml.PCA(n_components=cells_embedding_size)
+   204	    model.fit(counts_sparse_gpu[ad.obs['filtered'].values])
+   205	    ad.obsm['X_pca'] = model.transform(counts_sparse_gpu).get()
+   206	
+   207	    # Compute clusters on filtered cells
+   208	    cell_clusters = phenograph_rapids(
+   209	        ad[ad.obs['filtered']].obsm['X_pca'],
+   210	        n_neighbors=cells_clusters_n_neighbors, 
+   211	        resolution=cells_clusters_resolution,
+   212	        min_size=100,
+   213	    )
+   214	    ad.obs['phenograph_cluster'] = -1  # removed cells have no cluster
+   215	    ad.obs.loc[ad.obs['filtered'], 'phenograph_cluster'] = cell_clusters
+
+===== local graph setup caller: src/segger/data/data_module.py lines 190-230 =====
+   190	        tx_mask = pl.col(tx_fields.compartment).is_in(compartments)
+   191	        bd_mask = bd[bd_fields.boundary_type] == boundary_type
+   192	
+   193	        # Generate reference AnnData
+   194	        self.logger.debug("Generating reference AnnData object...")
+   195	        self.ad = setup_anndata(
+   196	            transcripts=tx.filter(tx_mask),
+   197	            boundaries=bd[bd_mask],
+   198	            cell_column=tx_fields.cell_id,
+   199	            cells_embedding_size=self.cells_embedding_size,
+   200	            cells_min_counts=self.cells_min_counts,
+   201	            cells_clusters_n_neighbors=self.cells_clusters_n_neighbors,
+   202	            cells_clusters_resolution=self.cells_clusters_resolution,
+   203	            genes_min_counts=self.genes_min_counts,
+   204	            genes_clusters_n_neighbors=self.genes_clusters_n_neighbors,
+   205	            genes_clusters_resolution=self.genes_clusters_resolution,
+   206	            compute_morphology=(self.cells_representation_mode == "morphology"),
+   207	        )
+   208	
+   209	        self.logger.debug("Setting up HeteroData object...")
+   210	        self.data = setup_heterodata(
+   211	            transcripts=tx,
+   212	            boundaries=bd,
+   213	            adata=self.ad,
+   214	            segmentation_mask=tx_mask, # This is the original mask, which is correct
+   215	            cells_embedding_key=(
+   216	                'X_pca'
+   217	                if self.cells_representation_mode == 'pca'
+   218	                else 'X_morphology'
+   219	            ),
+   220	            transcripts_graph_max_k=self.transcripts_graph_max_k,
+   221	            transcripts_graph_max_dist=self.transcripts_graph_max_dist,
+   222	            prediction_graph_mode=self.prediction_graph_mode,
+   223	            prediction_graph_max_k=self.prediction_graph_max_k,
+   224	            prediction_graph_buffer_ratio=self.prediction_graph_buffer_ratio,
+   225	        )
+   226	
+   227	        # Tile graph dataset
+   228	        self.logger.debug("Tiling graph dataset...")
+   229	        node_positions = torch.vstack([
+   230	            self.data['tx']['pos'],
+
+===== local graph construction: src/segger/data/utils/heterodata.py lines 133-153 =====
+   133	    # Transcript neighbors graph
+   134	    data['tx', 'neighbors', 'tx'].edge_index = setup_transcripts_graph(
+   135	        transcripts,
+   136	        max_k=transcripts_graph_max_k,
+   137	        max_dist=transcripts_graph_max_dist,
+   138	    )
+   139	
+   140	    # Reference segmentation graph
+   141	    data['tx', 'belongs', 'bd'].edge_index = setup_segmentation_graph(
+   142	        transcripts,
+   143	        segmentation_mask=segmentation_mask,
+   144	    )
+   145	
+   146	    # Transcript-cell graph for prediction
+   147	    data['tx', 'neighbors', 'bd'].edge_index = setup_prediction_graph(
+   148	        transcripts,
+   149	        boundaries,
+   150	        max_k=prediction_graph_max_k,
+   151	        buffer_ratio=prediction_graph_buffer_ratio,
+   152	        mode=prediction_graph_mode,
+   153	    )
+
+===== local GPU clustering path: src/segger/data/utils/neighbors.py lines 18-43 =====
+    18	def phenograph_rapids(
+    19	    X: ArrayLike,
+    20	    n_neighbors: int,
+    21	    min_size: int = -1,
+    22	    **kwargs,
+    23	) -> np.ndarray:
+    24	    """TODO: Add description.
+    25	    """
+    26	    X = cp.array(X)
+    27	    model = cuml.neighbors.NearestNeighbors(n_neighbors=n_neighbors)
+    28	    model.fit(X)
+    29	    _, indices = model.kneighbors(X)
+    30	
+    31	    n, k = indices.shape
+    32	    edges = cudf.concat([
+    33	        cudf.Series(np.repeat(np.arange(n), k), name='source', dtype="int32"),
+    34	        cudf.Series(indices.flatten(), name='destination', dtype="int32"),
+    35	    ], axis=1)
+    36	    G = cugraph.from_cudf_edgelist(edges)
+    37	    
+    38	    # Build jaccard-weighted graph in GPU
+    39	    jaccard_edges = cugraph.jaccard(G, edges[['source', 'destination']])
+    40	    G = cugraph.from_cudf_edgelist(jaccard_edges, *jaccard_edges.columns)
+    41	    
+    42	    # Cluster jaccard-weighted graph
+    43	    result, _ = cugraph.louvain(G, **kwargs)
+
+===== local prediction graph path: src/segger/data/utils/neighbors.py lines 181-219 =====
+   181	def setup_prediction_graph(
+   182	    tx: pl.DataFrame,
+   183	    bd: gpd.GeoDataFrame,
+   184	    max_k: int,
+   185	    buffer_ratio: float,
+   186	    mode: Literal['nucleus', 'cell', 'uniform'] = 'cell',
+   187	) -> torch.Tensor:
+   188	    """TODO: Add description.
+   189	    """
+   190	    tx_fields = TrainingTranscriptFields()
+   191	    bd_fields = TrainingBoundaryFields()
+   192	
+   193	    # Uniform kNN graph
+   194	    if mode == "uniform":
+   195	        points = tx[[tx_fields.x, tx_fields.y]].to_numpy()
+   196	        query = bd.geometry.centroid.get_coordinates().values
+   197	        edge_index, _ = kdtree_neighbors(
+   198	            points=points,
+   199	            query=query,
+   200	            max_k=max_k,
+   201	        )
+   202	        return edge_index
+   203	    
+   204	    # Shape-based graph
+   205	    points = tx[[tx_fields.x, tx_fields.y]].to_numpy()
+   206	    boundary_type = (bd_fields.cell_value if mode == "cell"
+   207	                     else bd_fields.nucleus_value)
+   208	    polygons = bd[bd[bd_fields.boundary_type] == boundary_type].geometry
+   209	    buffer_dists = np.sqrt(polygons.area / np.pi) * buffer_ratio
+   210	    polygons = polygons.buffer(buffer_dists).reset_index(drop=True)
+   211	    result = points_in_polygons(
+   212	        points=points,
+   213	        polygons=polygons,
+   214	        predicate='contains',
+   215	        batches=10,
+   216	    )
+   217	
+   218	    return torch.tensor(
+   219	        result[['index_query', 'index_match']].values.T).to(torch.int).cpu()
+
+===== external warning source =====
+/opt/venv/lib/python3.11/site-packages/scanpy/preprocessing/_normalization.py:299 warns: Some cells have zero counts

@@ -401,3 +401,278 @@ runtime-only environment variables UCX_MEMTYPE_CACHE=n,
 UCX_TLS=tcp,self,cuda_copy, and OMP_NUM_THREADS=1.
 No writes were made to /data, and segger segment was not run in Step 5c.
 ```
+
+## Step 5d minimal retry with runtime-only UCX environment
+
+Date: 2026-05-06 Australia/Sydney.
+Container name: `segger-local-env`.
+Docker image tag: `segger:cuda121-local`.
+Input directory: `/data/xenium`.
+Output directory: `/outputs/step5d-xenium-breast-2fov-minimal-ucx`.
+Log file: `/logs/step5d-xenium-breast-2fov-minimal-ucx.log`.
+
+Runtime-only environment:
+
+```text
+UCX_MEMTYPE_CACHE=n
+UCX_TLS=tcp,self,cuda_copy
+OMP_NUM_THREADS=1
+```
+
+Actual command:
+
+```bash
+UCX_MEMTYPE_CACHE=n UCX_TLS=tcp,self,cuda_copy OMP_NUM_THREADS=1 timeout 60m segger segment -i /data/xenium -o /outputs/step5d-xenium-breast-2fov-minimal-ucx --n-epochs 1 --max-nodes-per-tile 5000 --max-edges-per-batch 50000 --node-representation-dim 32 --hidden-channels 16 --out-channels 16 --n-mid-layers 1 --transcripts-max-k 2 --prediction-max-k 2
+```
+
+Timing:
+
+```text
+Start time: 2026-05-05T17:57:16+00:00
+End time: 2026-05-05T17:57:58+00:00
+Exit code: 139
+```
+
+Output check:
+
+```text
+segger_segmentation.parquet: not generated
+segger_anndata.h5ad: not generated
+Lightning logs: none found
+Output directory contained only /outputs/step5d-xenium-breast-2fov-minimal-ucx
+```
+
+Step 5d result:
+
+```text
+FAILED.
+Failure stage: graph construction / CUDA / UCX native crash.
+Evidence: the minimal workload with runtime-only UCX settings still crashed with
+signal 11 in libucx / WSL libcuda at cuCtxGetDevice_v2 immediately after the
+"Some cells have zero counts" warning and before Lightning logs or expected
+outputs were produced.
+Minimal next fixes to consider, not executed: isolate the failing native call
+outside segger segment with a minimal cuSpatial/cuGraph graph-construction
+script, test CPU/geopandas graph construction if supported, or test the same
+container/image on a native Linux CUDA host rather than WSL.
+No writes were made to /data, and no further segment retries were run.
+```
+
+## Step 5e graph-construction crash localization
+
+Date: 2026-05-06 Australia/Sydney.
+Container name: `segger-local-env`.
+Docker image tag: `segger:cuda121-local`.
+CLI discovery log: `/logs/step5e-cli-discovery.log`.
+Marker diagnostic log: `/logs/step5e-anndata-marker-v2.log`.
+Code path grep: `docs/reproduction-log/step5e-codepath-grep.txt`.
+Zero-count context: `docs/reproduction-log/step5e-zero-count-context.txt`.
+
+CLI discovery:
+
+```text
+Top-level commands: debug, segment.
+No standalone create-dataset, create_dataset, train, predict, preprocess,
+build-graph, build_graph, or data command was exposed.
+Debug commands: segment-only and predict-only.
+debug segment-only requires existing AnnData, predictions, and output paths.
+debug predict-only requires an existing checkpoint and output path.
+No safe standalone preprocess/create-dataset/build-graph CLI was available for
+this step.
+```
+
+Zero-count warning source:
+
+```text
+The literal warning string is not in SEGGER src.
+It comes from Scanpy:
+/opt/venv/lib/python3.11/site-packages/scanpy/preprocessing/_normalization.py:299
+warn("Some cells have zero counts", UserWarning, stacklevel=2)
+
+SEGGER reaches it from:
+src/segger/data/utils/anndata.py:193
+sc.pp.normalize_total(ad, target_sum=target_sum, layer='norm')
+```
+
+Localized crash substep:
+
+```text
+A marker-only setup_anndata diagnostic was run, without running full
+segger segment. It loaded Xenium transcripts and boundaries, then called
+setup_anndata with the same low embedding dimension used in Step 5d.
+
+Completed markers:
+- pp.transcripts loaded: (1035543, 6)
+- pp.boundaries loaded: (14295, 4)
+- scanpy.normalize_total completed
+- cuml.PCA.__init__ completed
+- cuml.PCA.fit completed
+- cuml.PCA.transform completed
+
+Last marker before crash:
+MARK before phenograph_rapids
+
+Fatal stack:
+src/segger/data/utils/anndata.py:208 calls phenograph_rapids(...)
+src/segger/data/utils/neighbors.py:51 returns
+result.sort_values('vertex')['partition'].values.get()
+The native stack again includes libucx and WSL libcuda cuCtxGetDevice_v2.
+```
+
+Graph construction and RAPIDS code paths:
+
+```text
+src/segger/data/data_module.py:193-207 builds reference AnnData via setup_anndata.
+src/segger/data/utils/anndata.py:202-205 runs cupyx sparse matrix plus cuml.PCA.
+src/segger/data/utils/anndata.py:208-213 calls phenograph_rapids for cell clusters.
+src/segger/data/utils/neighbors.py:18-51 implements phenograph_rapids with
+cupy, cuml.neighbors.NearestNeighbors, cudf, cugraph.from_cudf_edgelist,
+cugraph.jaccard, cugraph.louvain, and cudf values transfer back to host.
+src/segger/data/utils/heterodata.py:133-153 would later build transcript,
+segmentation, and prediction graphs, but the marker diagnostic crashed before
+setup_anndata returned to that stage.
+```
+
+Step 5e conclusion:
+
+```text
+Most specific observed crash substep: RAPIDS/cugraph-based phenograph_rapids
+during reference AnnData construction, after cuml.PCA completes and before
+HeteroData graph construction or Lightning setup. The crash occurs while
+handling the cugraph/cudf Louvain result and transferring/accessing the
+partition column values, matching the native libucx / WSL libcuda
+cuCtxGetDevice_v2 signature.
+
+Next suggested step, not executed: Step 5f should write the smallest
+phenograph_rapids / cugraph repro script using a small synthetic or sampled
+embedding matrix to isolate whether cugraph.jaccard, cugraph.louvain, or
+result['partition'].values.get() triggers the native crash. A standalone
+create_dataset/preprocess run is not recommended because no such CLI exists in
+this build.
+No writes were made to /data, and full segger segment was not run in Step 5e.
+```
+
+## Step 5f phenograph / cugraph minimal repro run
+
+Date: 2026-05-06 Australia/Sydney.
+Repro script path: `/work/step5f_phenograph_cugraph_repro.py`.
+Log path: `/logs/step5f-phenograph-cugraph-repro.log`.
+Source context: `docs/reproduction-log/step5f-phenograph-source-context.txt`.
+
+Runtime-only environment:
+
+```text
+UCX_MEMTYPE_CACHE=n
+UCX_TLS=tcp,self,cuda_copy
+OMP_NUM_THREADS=1
+```
+
+Run result:
+
+```text
+Exit code: 139.
+Last successful marker: MARK after result.sort_values vertex.
+Last attempted marker: MARK before result partition values.
+Crash step: state["sorted_result"]["partition"].values.
+The script did not reach result["partition"].values.get().
+The script did not reach SEGGER phenograph_rapids synthetic 1000x16 or 5000x16
+embedding tests.
+```
+
+Basic cugraph path:
+
+```text
+PASSED until cudf Series.values access.
+import cupy/cudf/cugraph/cuml: passed.
+create cudf edge dataframe: passed, shape (4000, 2).
+cugraph.Graph(): passed.
+G.from_cudf_edgelist: passed, 1000 nodes, 2000 edges.
+cugraph.jaccard(G): passed, output shape (9000, 3).
+cugraph.louvain(G): passed, output shape (1000, 2), score 0.8718500137329102.
+result.sort_values("vertex"): passed, output shape (1000, 2).
+result["partition"].values: native segfault.
+```
+
+Step 5f conclusion:
+
+```text
+Most specific isolated crash step: cudf/cupy/numba CUDA array view conversion
+when accessing a cudf Series .values property on the cugraph Louvain partition
+column. This reproduces the same libucx / WSL libcuda cuCtxGetDevice_v2 native
+segfault without running segger segment or reading /data.
+
+Current most likely root cause: RAPIDS cudf/cugraph result host-transfer or CUDA
+array-view conversion on WSL, not SEGGER raw Xenium boundary reading and not the
+basic cugraph jaccard/louvain computation itself.
+
+Minimal next step, not executed: Step 5g should test alternative non-mutating
+host transfer methods on the same small cugraph Louvain result, such as
+to_pandas(), to_arrow(), values_host if available, or cupy.asarray paths, to find
+whether there is a safe replacement for `.values.get()` without changing
+dependencies or running full segment.
+No writes were made to /data, and full segger segment was not run.
+```
+
+## Step 5g cugraph Louvain partition transfer alternatives
+
+Date: 2026-05-06 Australia/Sydney.
+Script path: `/work/step5g_cugraph_partition_transfer_repro.py`.
+Log path: `/logs/step5g-cugraph-partition-transfer-repro.log`.
+
+Runtime-only environment:
+
+```text
+UCX_MEMTYPE_CACHE=n
+UCX_TLS=tcp,self,cuda_copy
+OMP_NUM_THREADS=1
+```
+
+Main run result:
+
+```text
+Main script exit code: 0.
+Each transfer method was isolated in its own Python subprocess.
+Each subprocess rebuilt the same small synthetic cugraph Louvain result before
+testing one partition transfer method.
+```
+
+Per-method results:
+
+```text
+values_only: exit -11, native segfault at s.values.
+values_get: exit -11, native segfault at s.values before .get().
+to_pandas: exit -11, native segfault.
+to_pandas_numpy: exit -11, native segfault.
+to_numpy_default: exit -11, native segfault.
+to_numpy_na: exit -11, native segfault.
+to_arrow: exit 0, success, returned pyarrow.lib.Int32Array.
+to_cupy: exit -11, native segfault.
+cupy_asarray: exit 0, success, returned cupy.ndarray shape (1000,).
+astype_int32_to_pandas_numpy: exit -11, native segfault.
+astype_int64_to_pandas_numpy: exit -11, native segfault.
+```
+
+Step 5g conclusion:
+
+```text
+Confirmed unsafe in this WSL/CUDA/RAPIDS stack: cudf Series .values,
+.values.get(), to_pandas(), to_numpy(), to_cupy(), and cast-then-pandas paths
+on the cugraph Louvain partition Series.
+
+Confirmed working transfer/access alternatives in the synthetic repro:
+- s.to_arrow()
+- cupy.asarray(s)
+
+Best replacement candidate from this test: s.to_arrow(), because it produced a
+host-side pyarrow Int32Array without triggering the libucx / WSL libcuda
+cuCtxGetDevice_v2 native crash. cupy.asarray(s) also succeeded but remains a
+GPU array path, so it does not directly replace the current host NumPy return
+from phenograph_rapids.
+
+Next suggested step, not executed: Step 5h should test the exact minimal source
+replacement expression needed by phenograph_rapids, for example converting
+s.to_arrow() to a NumPy array, then patch only
+result.sort_values("vertex")["partition"].values.get() if that final host NumPy
+conversion is verified. Do not use pandas/to_numpy/value paths in the patch.
+No writes were made to /data, and full segger segment was not run.
+```

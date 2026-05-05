@@ -1,0 +1,275 @@
+===== grep CLI / segment entrypoints =====
+src/segger/cli/debug.py:16:def segment_only_cli(
+src/segger/cli/segment.py:65:def segment(
+src/segger/debug/segmentation.py:8:def run_segmentation_only(
+src/segger/data/utils/neighbors.py:164:def setup_segmentation_graph(
+src/segger/cli/segment.py:65:def segment(
+src/segger/cli/config.yaml:12:# Transcript-transcript graph parameters
+src/segger/cli/config.yaml:15:# Segmentation (prediction) graph parameters
+src/segger/cli/segment.py:36:group_transcripts_graph = Group(
+src/segger/cli/segment.py:38:    help="Related to transcript-transcript graph parameters.",
+src/segger/cli/segment.py:43:    help="Related to segmentation prediction graph parameters.",
+src/segger/cli/segment.py:130:        "transcripts_graph_max_k",  
+src/segger/cli/segment.py:132:        group=group_transcripts_graph,
+src/segger/cli/segment.py:133:    )] = registry.get_default("transcripts_graph_max_k"),
+src/segger/cli/segment.py:136:        "transcripts_graph_max_dist",
+src/segger/cli/segment.py:138:        group=group_transcripts_graph,
+src/segger/cli/segment.py:139:    )] = registry.get_default("transcripts_graph_max_dist"),
+src/segger/cli/segment.py:146:            "prediction_graph_mode",
+src/segger/cli/segment.py:149:    ] = registry.get_default("prediction_graph_mode"),
+src/segger/cli/segment.py:152:        "prediction_graph_max_k",
+src/segger/cli/segment.py:155:    )] = registry.get_default("prediction_graph_max_k"),
+src/segger/cli/segment.py:158:        "prediction_graph_buffer_ratio",
+src/segger/cli/segment.py:161:    )] = registry.get_default("prediction_graph_buffer_ratio"),
+src/segger/cli/segment.py:322:        transcripts_graph_max_k=transcripts_max_k,
+src/segger/cli/segment.py:323:        transcripts_graph_max_dist=transcripts_max_dist,
+src/segger/cli/segment.py:324:        prediction_graph_mode=prediction_mode,
+src/segger/cli/segment.py:325:        prediction_graph_max_k=prediction_max_k,
+src/segger/cli/segment.py:326:        prediction_graph_buffer_ratio=prediction_expansion_ratio,
+src/segger/data/partition/dataset.py:13:    """Stores partition metadata for a homogeneous graph.
+src/segger/data/partition/dataset.py:15:    This dataclass holds tensors that describe how a graph's nodes and edges
+src/segger/data/partition/dataset.py:82:    """Stores partition metadata for a heterogeneous graph.
+src/segger/data/partition/dataset.py:161:    """Represents a PyG dataset partitioned into disconnected subgraphs.
+src/segger/data/partition/dataset.py:164:    definition, producing a new graph where nodes and edges are permuted
+src/segger/data/partition/dataset.py:170:        The input graph to partition.
+src/segger/data/partition/dataset.py:174:          graphs) or a `dict[str, torch.Tensor]` (for heterogeneous
+src/segger/data/partition/dataset.py:175:          graphs) containing partition labels for each node.
+src/segger/data/partition/dataset.py:177:          object that already describes the partitioned graph.
+src/segger/data/partition/dataset.py:182:        The new, permuted graph object.
+src/segger/data/partition/dataset.py:223:        # Allow for graph transforms when retrieving items
+src/segger/data/partition/dataset.py:228:        Validates that a sparse partition object is consistent with the graph.
+src/segger/data/partition/dataset.py:233:                    "For a heterogeneous graph, sparse input must be a "
+src/segger/data/partition/dataset.py:257:                        f"is missing keys for the graph's node or edge types."
+src/segger/data/partition/dataset.py:265:        else:  # homogeneous graph
+src/segger/data/partition/dataset.py:268:                    "For a homogeneous graph, sparse input must be a "
+src/segger/data/partition/dataset.py:285:        Validates that a dense partition input is consistent with the graph.
+src/segger/data/partition/dataset.py:290:                    "For a heterogeneous graph, dense input must be a "
+src/segger/data/partition/dataset.py:306:                "For a homogeneous graph, dense input must be a `torch.Tensor`."
+src/segger/data/partition/dataset.py:506:        """Get the graph partition associated at location `index`. 
+src/segger/data/partition/dataset.py:509:        and edge attributes associated with the indexed graph partition. Other
+src/segger/data/partition/dataset.py:583:        original graph before partitioning.
+src/segger/data/partition/dataset.py:591:            original, un-partitioned graph.
+src/segger/data/partition/dataset.py:594:            heterogeneous graphs.
+src/segger/data/partition/dataset.py:599:            If `node_type` is omitted for a heterogeneous graph, if the `attr` 
+src/segger/data/partition/dataset.py:601:            provided for a homogeneous graph.
+src/segger/data/partition/sampler.py:295:    This sampler groups partitions (e.g., subgraphs) into batches using bin 
+src/segger/data/data_module.py:74:    This class handles preprocessing, graph construction, tiling, and
+src/segger/data/data_module.py:77:    embedding data into graph-compatible datasets with configurable
+src/segger/data/data_module.py:100:    transcripts_graph_max_k : int, default=5
+src/segger/data/data_module.py:101:        Maximum number of edges per transcript in the local graph.
+src/segger/data/data_module.py:102:    transcripts_graph_max_dist : float, default=5.0
+src/segger/data/data_module.py:103:        Maximum edge distance for transcript graph construction.
+src/segger/data/data_module.py:104:    segmentation_graph_mode : {"nucleus", "cell"}, default="nucleus"
+src/segger/data/data_module.py:105:        Type of segmentation boundaries used for graph edges.
+src/segger/data/data_module.py:106:    segmentation_graph_negative_edge_rate : float, default=1.0
+src/segger/data/data_module.py:107:        Ratio of negative to positive edges in the segmentation graph.
+src/segger/data/data_module.py:108:    prediction_graph_mode : {"nucleus", "cell", "uniform"}, default="cell"
+src/segger/data/data_module.py:110:    prediction_graph_max_k : int, default=3
+src/segger/data/data_module.py:111:        Maximum number of edges per transcript for prediction graphs.
+src/segger/data/data_module.py:112:    prediction_graph_max_dist : float, default=1.0
+src/segger/data/data_module.py:113:        Maximum distance for edges in prediction graphs.
+src/segger/data/data_module.py:115:        Strategy for spatial graph tiling (adaptive quadtree or grid).
+src/segger/data/data_module.py:139:    transcripts_graph_max_k: int = 5
+src/segger/data/data_module.py:140:    transcripts_graph_max_dist: float = 5.
+src/segger/data/data_module.py:141:    segmentation_graph_mode: Literal["nucleus", "cell"] = "nucleus"
+src/segger/data/data_module.py:142:    segmentation_graph_negative_edge_rate: float = 1.
+src/segger/data/data_module.py:143:    prediction_graph_mode: Literal["nucleus", "cell", "uniform"] = "cell"
+src/segger/data/data_module.py:144:    prediction_graph_max_k: int = 3
+src/segger/data/data_module.py:145:    prediction_graph_buffer_ratio: float = 0.05
+src/segger/data/data_module.py:176:        if self.segmentation_graph_mode == "nucleus":
+src/segger/data/data_module.py:179:        elif self.segmentation_graph_mode == "cell":
+src/segger/data/data_module.py:187:                f"Unrecognized segmentation graph mode: "
+src/segger/data/data_module.py:188:                f"'{self.segmentation_graph_mode}'."
+src/segger/data/data_module.py:220:            transcripts_graph_max_k=self.transcripts_graph_max_k,
+src/segger/data/data_module.py:221:            transcripts_graph_max_dist=self.transcripts_graph_max_dist,
+src/segger/data/data_module.py:222:            prediction_graph_mode=self.prediction_graph_mode,
+src/segger/data/data_module.py:223:            prediction_graph_max_k=self.prediction_graph_max_k,
+src/segger/data/data_module.py:224:            prediction_graph_buffer_ratio=self.prediction_graph_buffer_ratio,
+src/segger/data/data_module.py:227:        # Tile graph dataset
+src/segger/data/data_module.py:228:        self.logger.debug("Tiling graph dataset...")
+src/segger/data/tile_dataset.py:15:    Partitions a PyG graph based on a geometric tiling of its nodes.
+src/segger/data/tile_dataset.py:25:        The input graph object containing node geometries.
+src/segger/data/tile_dataset.py:55:        # Partition graph by tiling
+src/segger/data/tile_dataset.py:159:    This dataset provides subgraphs of a larger graph based on spatial
+src/segger/data/tile_dataset.py:160:    tiling. Each item corresponds to a tile, returning the subgraph of
+src/segger/data/tile_dataset.py:166:        The full graph dataset containing node positions and edges.
+src/segger/data/tile_dataset.py:205:        """Get the graph tile associated at location `index`. 
+src/segger/data/tile_dataset.py:208:        and edge attributes associated with the indexed graph partition. Other
+src/segger/data/tile_dataset.py:244:            sample = self.data.subgraph(subset)
+src/segger/data/tile_dataset.py:257:            sample = self.data.subgraph(subset)
+src/segger/data/utils/anndata.py:14:from .neighbors import phenograph_rapids
+src/segger/data/utils/anndata.py:208:    cell_clusters = phenograph_rapids(
+src/segger/data/utils/anndata.py:214:    ad.obs['phenograph_cluster'] = -1  # removed cells have no cluster
+src/segger/data/utils/anndata.py:215:    ad.obs.loc[ad.obs['filtered'], 'phenograph_cluster'] = cell_clusters
+src/segger/data/utils/anndata.py:216:    ad.obs['phenograph_cluster'] = pd.Categorical(ad.obs['phenograph_cluster'])
+src/segger/data/utils/anndata.py:221:        clusters=torch.tensor(ad.obs['phenograph_cluster'].values),
+src/segger/data/utils/anndata.py:225:    ad.var['phenograph_cluster'] = phenograph_rapids(
+src/segger/data/utils/anndata.py:231:    ad.var['phenograph_cluster'] = pd.Categorical(ad.var['phenograph_cluster'])
+src/segger/data/utils/anndata.py:236:        clusters=torch.tensor(ad.var['phenograph_cluster'].values),
+src/segger/data/utils/__init__.py:3:from .neighbors import phenograph_rapids
+src/segger/data/utils/heterodata.py:11:    setup_segmentation_graph,
+src/segger/data/utils/heterodata.py:12:    setup_transcripts_graph,
+src/segger/data/utils/heterodata.py:13:    setup_prediction_graph,
+src/segger/data/utils/heterodata.py:22:    transcripts_graph_max_k: int,
+src/segger/data/utils/heterodata.py:23:    transcripts_graph_max_dist: float,
+src/segger/data/utils/heterodata.py:24:    prediction_graph_mode: Literal["nucleus", "cell", "uniform"],
+src/segger/data/utils/heterodata.py:25:    prediction_graph_max_k: int,
+src/segger/data/utils/heterodata.py:26:    prediction_graph_buffer_ratio: float,
+src/segger/data/utils/heterodata.py:28:    cells_clusters_column: str = 'phenograph_cluster',
+src/segger/data/utils/heterodata.py:31:    genes_clusters_column: str = 'phenograph_cluster',
+src/segger/data/utils/heterodata.py:133:    # Transcript neighbors graph
+src/segger/data/utils/heterodata.py:134:    data['tx', 'neighbors', 'tx'].edge_index = setup_transcripts_graph(
+src/segger/data/utils/heterodata.py:136:        max_k=transcripts_graph_max_k,
+src/segger/data/utils/heterodata.py:137:        max_dist=transcripts_graph_max_dist,
+src/segger/data/utils/heterodata.py:140:    # Reference segmentation graph
+src/segger/data/utils/heterodata.py:141:    data['tx', 'belongs', 'bd'].edge_index = setup_segmentation_graph(
+src/segger/data/utils/heterodata.py:146:    # Transcript-cell graph for prediction
+src/segger/data/utils/heterodata.py:147:    data['tx', 'neighbors', 'bd'].edge_index = setup_prediction_graph(
+src/segger/data/utils/heterodata.py:150:        max_k=prediction_graph_max_k,
+src/segger/data/utils/heterodata.py:151:        buffer_ratio=prediction_graph_buffer_ratio,
+src/segger/data/utils/heterodata.py:152:        mode=prediction_graph_mode,
+src/segger/data/utils/neighbors.py:8:import cugraph
+src/segger/data/utils/neighbors.py:18:def phenograph_rapids(
+src/segger/data/utils/neighbors.py:36:    G = cugraph.from_cudf_edgelist(edges)
+src/segger/data/utils/neighbors.py:38:    # Build jaccard-weighted graph in GPU
+src/segger/data/utils/neighbors.py:39:    jaccard_edges = cugraph.jaccard(G, edges[['source', 'destination']])
+src/segger/data/utils/neighbors.py:40:    G = cugraph.from_cudf_edgelist(jaccard_edges, *jaccard_edges.columns)
+src/segger/data/utils/neighbors.py:42:    # Cluster jaccard-weighted graph
+src/segger/data/utils/neighbors.py:43:    result, _ = cugraph.louvain(G, **kwargs)
+src/segger/data/utils/neighbors.py:147:def setup_transcripts_graph(
+src/segger/data/utils/neighbors.py:164:def setup_segmentation_graph(
+src/segger/data/utils/neighbors.py:181:def setup_prediction_graph(
+src/segger/data/utils/neighbors.py:193:    # Uniform kNN graph
+src/segger/data/utils/neighbors.py:204:    # Shape-based graph
+src/segger/models/lightning_model.py:223:            batch_size=batch.num_graphs,
+src/segger/models/lightning_model.py:229:            batch_size=batch.num_graphs,
+src/segger/models/lightning_model.py:235:            batch_size=batch.num_graphs,
+src/segger/models/lightning_model.py:247:            batch_size=batch.num_graphs,
+src/segger/models/lightning_model.py:253:            batch_size=batch.num_graphs,
+src/segger/models/lightning_model.py:259:            batch_size=batch.num_graphs,
+src/segger/validation/contamination.py:5:import cupy as cp
+src/segger/validation/contamination.py:56:        Number of nearest neighbours queried for each cell.
+src/segger/metrics/segment.py:4:import cupy as cp
+src/segger/metrics/segment.py:5:import cudf
+src/segger/metrics/segment.py:6:import cuspatial
+src/segger/metrics/segment.py:83:    region = dask_cudf.read_parquet(
+src/segger/metrics/segment.py:93:    boundaries: cudf.DataFrame,
+src/segger/metrics/segment.py:102:    polygons = cuspatial.GeoSeries.from_polygons_xy(
+src/segger/metrics/segment.py:114:    transcripts: cudf.DataFrame,
+src/segger/metrics/segment.py:119:    points = cuspatial.GeoSeries.from_points_xy(coords.interleave_columns())
+src/segger/metrics/segment.py:126:    boundaries: cudf.DataFrame,
+src/segger/metrics/segment.py:160:    polygons: cuspatial.GeoSeries,
+src/segger/metrics/segment.py:165:    polygons_buffered = cuspatial.GeoSeries(buffered)
+src/segger/metrics/segment.py:193:    points: cuspatial.GeoSeries,
+src/segger/metrics/segment.py:195:    polygons: cuspatial.GeoSeries,
+src/segger/metrics/segment.py:204:    keys_to_pts, quadtree = cuspatial.quadtree_on_points(points, **kwargs)
+src/segger/metrics/segment.py:208:    bboxes = cuspatial.polygon_bounding_boxes(polygons)
+src/segger/metrics/segment.py:209:    poly_quad_pairs = cuspatial.join_quadtree_and_bounding_boxes(
+src/segger/metrics/segment.py:216:    result = cuspatial.quadtree_point_in_polygon(
+src/segger/metrics/segment.py:225:    codes = cudf.Series(points_idx)
+src/segger/metrics/segment.py:231:    row_ind = result['polygon_index'].map(cudf.Series(row_uniques))
+src/segger/metrics/segment.py:353:    _, quadtree = cuspatial.quadtree_on_points(points, **kwargs)
+src/segger/metrics/segment.py:373:    boundaries = dask_cudf.read_parquet(
+src/segger/geometry/quadtree.py:7:import cupy as cp
+src/segger/geometry/quadtree.py:8:import cuspatial
+src/segger/geometry/quadtree.py:9:import cudf
+src/segger/geometry/quadtree.py:13:    points: cuspatial.GeoSeries,
+src/segger/geometry/quadtree.py:15:    """Calculate keyword arguments for `cuspatial.quadtree_on_points`.
+src/segger/geometry/quadtree.py:19:    points : cuspatial.GeoSeries
+src/segger/geometry/quadtree.py:94:    quadtree: cudf.DataFrame,
+src/segger/geometry/quadtree.py:101:    Add spatial bounds to each leaf in a cuSpatial quadtree.
+src/segger/geometry/quadtree.py:108:    quadtree : cudf.DataFrame
+src/segger/geometry/quadtree.py:109:        cuSpatial quadtree DataFrame with 'key' and 'level' columns.
+src/segger/geometry/quadtree.py:117:    cudf.DataFrame
+src/segger/geometry/quadtree.py:140:    points: cuspatial.GeoSeries,
+src/segger/geometry/quadtree.py:143:) -> tuple[cudf.Series, cudf.DataFrame]:
+src/segger/geometry/quadtree.py:144:    """Build a cuSpatial quadtree from 2D point data.
+src/segger/geometry/quadtree.py:148:    points : cuspatial.GeoSeries
+src/segger/geometry/quadtree.py:158:    order : cudf.Series
+src/segger/geometry/quadtree.py:160:    quadtree : cudf.DataFrame
+src/segger/geometry/quadtree.py:173:    indices, quadtree = cuspatial.quadtree_on_points(
+src/segger/geometry/quadtree.py:197:    quadtree: cudf.DataFrame,
+src/segger/geometry/quadtree.py:198:    backend: Literal['cuspatial', 'geopandas'],
+src/segger/geometry/quadtree.py:199:) -> cuspatial.GeoSeries | gpd.GeoSeries:
+src/segger/geometry/quadtree.py:200:    """Helper function to convert cuspatial Quadtree to leaf geometries.
+src/segger/geometry/quadtree.py:204:    quadtree : cudf.DataFrame
+src/segger/geometry/quadtree.py:205:        cuSpatial quadtree DataFrame with boundary coordinates.
+src/segger/geometry/quadtree.py:209:    cuspatial.GeoSeries | gpd.GeoSeries
+src/segger/geometry/quadtree.py:223:    if backend == 'cuspatial':
+src/segger/geometry/quadtree.py:224:        return cuspatial.GeoSeries.from_polygons_xy(
+src/segger/geometry/query.py:4:import cuspatial
+src/segger/geometry/query.py:5:import cudf
+src/segger/geometry/query.py:18:    points: cuspatial.GeoSeries,
+src/segger/geometry/query.py:19:    polygons: cuspatial.GeoSeries,
+src/segger/geometry/query.py:22:) -> cudf.DataFrame:
+src/segger/geometry/query.py:45:    cudf.DataFrame
+src/segger/geometry/query.py:66:        bboxes = cuspatial.polygon_bounding_boxes(batch_polygons)
+src/segger/geometry/query.py:67:        poly_quad_pairs = cuspatial.join_quadtree_and_bounding_boxes(
+src/segger/geometry/query.py:73:        result = cuspatial.quadtree_point_in_polygon(
+src/segger/geometry/query.py:85:    result = cudf.concat(results, ignore_index=True)
+src/segger/geometry/query.py:100:    points: cuspatial.GeoSeries,
+src/segger/geometry/query.py:101:    polygons: cuspatial.GeoSeries,
+src/segger/geometry/query.py:105:) -> cudf.DataFrame:
+src/segger/geometry/query.py:130:    cudf.DataFrame
+src/segger/geometry/query.py:138:    idx_all = cudf.RangeIndex(len(points))
+src/segger/geometry/query.py:149:            backend='cuspatial',
+src/segger/geometry/query.py:165:    boundary = cudf.DataFrame(
+src/segger/geometry/query.py:173:    return cudf.concat([contains, boundary]).reset_index(drop=True)
+src/segger/geometry/query.py:182:) -> cudf.DataFrame:
+src/segger/geometry/query.py:213:    cudf.DataFrame
+src/segger/geometry/query.py:224:    points = points_to_geoseries(points, backend='cuspatial')
+src/segger/geometry/query.py:225:    polygons = polygons_to_geoseries(polygons, backend='cuspatial')
+src/segger/geometry/conversion.py:6:import cupy as cp
+src/segger/geometry/conversion.py:7:import cuspatial
+src/segger/geometry/conversion.py:10:import cudf
+src/segger/geometry/conversion.py:12:from cuspatial.utils.column_utils import (
+src/segger/geometry/conversion.py:85:def _(data: cuspatial.GeoSeries):
+src/segger/geometry/conversion.py:88:            f"Input must be a non-empty cuspatial.GeoSeries of points."
+src/segger/geometry/conversion.py:90:    return data.points.xy.to_cupy().reshape(-1, 2)  # inherently 2D
+src/segger/geometry/conversion.py:95:    backend: Literal['geopandas', 'cuspatial']
+src/segger/geometry/conversion.py:96:) -> gpd.GeoSeries | cuspatial.GeoSeries:
+src/segger/geometry/conversion.py:109:        - GeoPandas/cuSpatial GeoSeries of 2D points
+src/segger/geometry/conversion.py:110:    backend : Literal['geopandas', 'cuspatial']
+src/segger/geometry/conversion.py:115:    gpd.GeoSeries | cuspatial.GeoSeries
+src/segger/geometry/conversion.py:127:    if backend not in ['geopandas', 'cuspatial']:
+src/segger/geometry/conversion.py:130:            f"'geopandas' and 'cuspatial'."
+src/segger/geometry/conversion.py:134:       (backend == 'cuspatial' and isinstance(data, cuspatial.GeoSeries)):
+src/segger/geometry/conversion.py:143:        if isinstance(data, cuspatial.GeoSeries):
+src/segger/geometry/conversion.py:145:    else:  # cuspatial
+src/segger/geometry/conversion.py:147:        points = cuspatial.GeoSeries.from_points_xy(coords)
+src/segger/geometry/conversion.py:149:            points.index = cudf.Index(data.index)
+src/segger/geometry/conversion.py:223:def _(data: cuspatial.GeoSeries):
+src/segger/geometry/conversion.py:226:            f"Input must be a non-empty cuspatial.GeoSeries of polygons."
+src/segger/geometry/conversion.py:228:    vertices = data.polygons.xy.to_cupy().reshape(-1, 2)
+src/segger/geometry/conversion.py:235:    backend: Literal['geopandas', 'cuspatial']
+src/segger/geometry/conversion.py:236:) -> gpd.GeoSeries | cuspatial.GeoSeries:
+src/segger/geometry/conversion.py:250:        - GeoPandas/cuSpatial GeoSeries of polygons
+src/segger/geometry/conversion.py:251:    backend : Literal['geopandas', 'cuspatial']
+src/segger/geometry/conversion.py:256:    gpd.GeoSeries | cuspatial.GeoSeries
+src/segger/geometry/conversion.py:268:    if backend not in ['geopandas', 'cuspatial']:
+src/segger/geometry/conversion.py:271:            f"'geopandas' and 'cuspatial'."
+src/segger/geometry/conversion.py:275:       (backend == 'cuspatial' and isinstance(data, cuspatial.GeoSeries)):
+src/segger/geometry/conversion.py:290:        if isinstance(data, cuspatial.GeoSeries):
+src/segger/geometry/conversion.py:292:    else:  # cuspatial
+src/segger/geometry/conversion.py:296:        polygons = cuspatial.GeoSeries.from_polygons_xy(
+src/segger/geometry/conversion.py:303:            polygons.index = cudf.Index(data.index)
+src/segger/geometry/conversion.py:321:        'cuda', uses `cuspatial` for acceleration. Defaults to None (cpu).
+src/segger/geometry/conversion.py:331:    backend = 'cuspatial' if device == 'cuda' else 'geopandas'
+src/segger/data/tiling.py:8:import cudf
+src/segger/data/tiling.py:49:    ) -> cudf.DataFrame:
+src/segger/data/tiling.py:201:        points = points_to_geoseries(positions, backend='cuspatial')
+src/segger/data/utils/anndata.py:10:import cupyx
+src/segger/data/utils/anndata.py:202:    counts_sparse_gpu = cupyx.scipy.sparse.csr_matrix(ad.layers['norm'])
+src/segger/data/utils/neighbors.py:7:import cupy as cp
+src/segger/data/utils/neighbors.py:8:import cugraph
+src/segger/data/utils/neighbors.py:11:import cudf
+src/segger/data/utils/neighbors.py:32:    edges = cudf.concat([
+src/segger/data/utils/neighbors.py:33:        cudf.Series(np.repeat(np.arange(n), k), name='source', dtype="int32"),
+src/segger/data/utils/neighbors.py:34:        cudf.Series(indices.flatten(), name='destination', dtype="int32"),
+src/segger/data/utils/neighbors.py:36:    G = cugraph.from_cudf_edgelist(edges)
+src/segger/data/utils/neighbors.py:39:    jaccard_edges = cugraph.jaccard(G, edges[['source', 'destination']])
+src/segger/data/utils/neighbors.py:40:    G = cugraph.from_cudf_edgelist(jaccard_edges, *jaccard_edges.columns)
+src/segger/data/utils/neighbors.py:43:    result, _ = cugraph.louvain(G, **kwargs)
+src/segger/data/utils/neighbors.py:54:def knn_to_edge_index(
+src/segger/data/utils/neighbors.py:95:def edge_index_to_knn(
+src/segger/data/utils/neighbors.py:140:    edge_index, index_pointer = knn_to_edge_index(indices)
