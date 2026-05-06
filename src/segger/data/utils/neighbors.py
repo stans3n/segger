@@ -238,6 +238,11 @@ def setup_prediction_graph(
     buffer_dists = np.sqrt(polygons.area / np.pi) * buffer_ratio
     polygons = polygons.buffer(buffer_dists).reset_index(drop=True)
     if os.environ.get("SEGGER_WSL_CPU_PIP_FALLBACK") == "1":
+        print(
+            "Using SEGGER_WSL_CPU_PIP_FALLBACK=1; CPU point-in-polygon "
+            "fallback is a local WSL compatibility workaround.",
+            flush=True,
+        )
         result = _points_in_polygons_cpu_contains(points, polygons)
     else:
         result = points_in_polygons(

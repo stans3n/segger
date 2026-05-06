@@ -11,6 +11,7 @@ import polars as pl
 import torch
 import gc
 import numpy as np
+import os
 
 from .tile_dataset import (
     TileFitDataset,
@@ -156,6 +157,17 @@ class ISTDataModule(LightningDataModule):
         """
         super().__init__()
         self.logger = logging.getLogger(__name__)
+        if (
+            os.environ.get("SEGGER_WSL_TILING_FALLBACK", "").strip() == "square"
+            and self.num_workers != 0
+        ):
+            print(
+                "Using SEGGER_WSL_TILING_FALLBACK=square; setting "
+                "num_workers=0 to avoid local WSL Docker shared-memory "
+                "DataLoader worker failures.",
+                flush=True,
+            )
+            self.num_workers = 0
         self.save_hyperparameters()
         self.load()
 
@@ -230,11 +242,30 @@ class ISTDataModule(LightningDataModule):
             self.data['tx']['pos'],
             self.data['bd']['pos'],
         ])
+        tiling_fallback = os.environ.get("SEGGER_WSL_TILING_FALLBACK", "").strip()
         if self.tiling_mode == "adaptive":
-            self.tiling = QuadTreeTiling(
-                positions=node_positions,
-                max_tile_size=self.tiling_nodes_per_tile,
-            )
+            if tiling_fallback == "square":
+                print(
+                    "Using SEGGER_WSL_TILING_FALLBACK=square; this is a "
+                    "local WSL smoke-test compatibility fallback and may "
+                    "not be strict original SEGGER baseline.",
+                    flush=True,
+                )
+                self.tiling = SquareTiling(
+                    positions=node_positions,
+                    side_length=self.tiling_side_length,
+                    use_cpu_query=True,
+                )
+            elif tiling_fallback:
+                raise ValueError(
+                    "Unsupported SEGGER_WSL_TILING_FALLBACK value: "
+                    f"'{tiling_fallback}'. Supported values: 'square'."
+                )
+            else:
+                self.tiling = QuadTreeTiling(
+                    positions=node_positions,
+                    max_tile_size=self.tiling_nodes_per_tile,
+                )
         #TODO: Remove (benchmarking only)
         elif self.tiling_mode == "square":
             self.tiling = SquareTiling(

@@ -237,6 +237,7 @@ class SquareTiling(Tiling):
         self,
         positions: torch.Tensor,
         side_length: float,
+        use_cpu_query: bool = False,
     ):
         if side_length <= 0:
             raise ValueError(
@@ -256,6 +257,7 @@ class SquareTiling(Tiling):
         self.min_y = positions[:, 1].min().item()
         self.max_y = positions[:, 1].max().item()
         self.side_length = side_length
+        self.use_cpu_query = use_cpu_query
         super().__init__()
 
     @cached_property
@@ -280,3 +282,72 @@ class SquareTiling(Tiling):
             np.minimum(y.ravel() + self.side_length, self.max_y)
         ])
         return gpd.GeoSeries([box(*c) for c in coords])
+
+    def _query_tiles(
+        self,
+        geometry: torch.Tensor,
+        inclusive: bool = True,
+        margin: float = 0.0,
+    ) -> torch.Tensor:
+        if not self.use_cpu_query:
+            return super()._query_tiles(
+                geometry=geometry,
+                inclusive=inclusive,
+                margin=margin,
+            )
+        if geometry.dim() not in [2, 3] or geometry.shape[-1] != 2:
+            raise ValueError(
+                f"Input 'geometry' must be a tensor of points of shape (N, 2) "
+                f"or polygons of shape (N, V, 2), but got {geometry.shape}."
+            )
+        if margin < 0:
+            raise ValueError(
+                f"The margin must be non-negative, but got {margin}."
+            )
+
+        tiles = self.tiles
+        if margin > 0:
+            buffered = tiles.buffer(
+                -margin,
+                cap_style='square',
+                join_style='mitre',
+                mitre_limit=margin / 2,
+            )
+            missing = buffered.is_empty.sum()
+            if missing != 0:
+                raise ValueError(
+                    f"Margin ({margin}) is too large, causing {missing} "
+                    f"tile(s) to disappear. Consider using a smaller margin."
+                )
+            tiles = buffered
+
+        labels = np.full(len(geometry), -1, dtype=np.int64)
+        if geometry.dim() == 2:
+            points = geometry.detach().cpu().numpy()
+            for index_match, tile in enumerate(tiles):
+                min_x, min_y, max_x, max_y = tile.bounds
+                if inclusive:
+                    matches = (
+                        (points[:, 0] >= min_x) &
+                        (points[:, 0] <= max_x) &
+                        (points[:, 1] >= min_y) &
+                        (points[:, 1] <= max_y)
+                    )
+                else:
+                    matches = (
+                        (points[:, 0] > min_x) &
+                        (points[:, 0] < max_x) &
+                        (points[:, 1] > min_y) &
+                        (points[:, 1] < max_y)
+                    )
+                labels[(labels == -1) & matches] = index_match
+        else:
+            polygons = polygons_to_geoseries(geometry, backend='geopandas')
+            for index_match, tile in enumerate(tiles):
+                if inclusive:
+                    matches = polygons.intersects(tile).to_numpy()
+                else:
+                    matches = polygons.within(tile).to_numpy()
+                labels[(labels == -1) & matches] = index_match
+
+        return torch.tensor(labels, device=geometry.device, dtype=torch.int64)
