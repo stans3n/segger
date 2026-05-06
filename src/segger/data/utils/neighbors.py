@@ -10,6 +10,7 @@ import torch
 import cuml
 import cudf
 import gc
+import os
 
 from ...io import TrainingTranscriptFields, TrainingBoundaryFields
 from ...geometry import points_in_polygons
@@ -48,7 +49,9 @@ def phenograph_rapids(
     result['partition'] = result['partition'].map(sizes)
     
     # Sort by vertex (e.g. cell)
-    return result.sort_values('vertex')['partition'].values.get()
+    sorted_result = result.sort_values('vertex')
+    partition = sorted_result['partition'].to_arrow().to_numpy(zero_copy_only=False)
+    return partition
 
 
 def knn_to_edge_index(
@@ -178,6 +181,32 @@ def setup_segmentation_graph(
     )
 
 
+def _points_in_polygons_cpu_contains(
+    points: np.ndarray,
+    polygons: gpd.GeoSeries,
+):
+    """Local WSL compatibility fallback for cuspatial point-in-polygon joins."""
+    import pandas as pd
+
+    points_gdf = gpd.GeoDataFrame(
+        {"index_query": np.arange(len(points), dtype=np.int64)},
+        geometry=gpd.points_from_xy(points[:, 0], points[:, 1]),
+    )
+    polygons_gdf = gpd.GeoDataFrame(
+        {"index_match": np.arange(len(polygons), dtype=np.int64)},
+        geometry=polygons.reset_index(drop=True),
+    )
+    result = gpd.sjoin(points_gdf, polygons_gdf, how="inner", predicate="within")
+    if result.empty:
+        return pd.DataFrame(
+            {
+                "index_query": pd.Series(dtype=np.int64),
+                "index_match": pd.Series(dtype=np.int64),
+            }
+        )
+    return result[["index_query", "index_match"]].reset_index(drop=True)
+
+
 def setup_prediction_graph(
     tx: pl.DataFrame,
     bd: gpd.GeoDataFrame,
@@ -208,12 +237,15 @@ def setup_prediction_graph(
     polygons = bd[bd[bd_fields.boundary_type] == boundary_type].geometry
     buffer_dists = np.sqrt(polygons.area / np.pi) * buffer_ratio
     polygons = polygons.buffer(buffer_dists).reset_index(drop=True)
-    result = points_in_polygons(
-        points=points,
-        polygons=polygons,
-        predicate='contains',
-        batches=10,
-    )
+    if os.environ.get("SEGGER_WSL_CPU_PIP_FALLBACK") == "1":
+        result = _points_in_polygons_cpu_contains(points, polygons)
+    else:
+        result = points_in_polygons(
+            points=points,
+            polygons=polygons,
+            predicate='contains',
+            batches=10,
+        )
 
     return torch.tensor(
         result[['index_query', 'index_match']].values.T).to(torch.int).cpu()
